@@ -76,12 +76,63 @@ def get_prox(idx: int) -> float:
     return proximity[idx].getValue()
 
 
+def show_current_results(current_time: float, is_final: bool = False) -> None:
+    """
+    Muestra y guarda los resultados actuales de la navegación.
+
+    Args:
+        current_time (float): Tiempo actual de la simulación
+        is_final (bool): Si es el reporte final o periódico
+    """
+    total_time = current_time - start
+
+    # Mostrar en consola
+    prefix = (
+        "===== RESULTADOS FINALES ====="
+        if is_final
+        else "===== REPORTE PERIÓDICO ====="
+    )
+    print(f"\n{prefix}")
+    print(f"Tiempo transcurrido  : {total_time:.2f} s")
+    print(f"Distancia aprox.     : {travelled:.2f} unidades")
+    print(f"Colisiones           : {crashes}")
+    print(f"Meta alcanzada       : {'Sí' if goal_done else 'No'}")
+    print(
+        f"Estado actual        : {'Atascado' if stuck_loops >= MAX_STUCK else 'Navegando'}"
+    )
+
+    # Guardar en archivo
+    suffix = "final" if is_final else "periodico"
+    fecha_actual = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    try:
+        filename = f"resultados_navegacion_{suffix}_{fecha_actual}.txt"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"{prefix}\n")
+            f.write(f"Tiempo transcurrido  : {total_time:.2f} s\n")
+            f.write(f"Distancia aprox.     : {travelled:.2f} unidades\n")
+            f.write(f"Colisiones           : {crashes}\n")
+            f.write(f"Meta alcanzada       : {'Sí' if goal_done else 'No'}\n")
+            f.write(
+                f"Estado actual        : {'Atascado' if stuck_loops >= MAX_STUCK else 'Navegando'}\n"
+            )
+            f.write(f"Iteraciones atascado : {stuck_loops}\n")
+
+        if not is_final:
+            print(f"📁 Reporte guardado: {filename}")
+
+    except Exception as e:
+        print(f"⚠️ No se pudo guardar el archivo: {e}")
+
+
 # ===== MÉTRICAS =====
 start = robot.getTime()
 travelled = 0.0
 crashes = 0
 goal_done = False
 stuck_loops = 0
+last_report_time = start
+REPORT_INTERVAL = 10.0  # Mostrar resultados cada 10 segundos
 
 
 # ===== LÓGICA DE NAVEGACIÓN =====
@@ -135,11 +186,18 @@ MAX_STUCK = 50
 
 while robot.step(STEP_DURATION) != -1 and not goal_done and stuck_loops < MAX_STUCK:
     main_navigation()
+
     # Calcular distancia
     v_l = motor_left.getVelocity()
     v_r = motor_right.getVelocity()
     v_mean = (v_l + v_r) / 2
     travelled += abs(v_mean * (STEP_DURATION / 1000))
+
+    # Mostrar resultados periódicos
+    current_time = robot.getTime()
+    if current_time - last_report_time >= REPORT_INTERVAL:
+        show_current_results(current_time, is_final=False)
+        last_report_time = current_time
 
 # Parar motores
 motor_left.setVelocity(0)
@@ -152,28 +210,4 @@ if stuck_loops >= MAX_STUCK and not goal_done:
 
 # ===== RESULTADOS =====
 end = robot.getTime()
-total = end - start
-
-print("\n===== RESULTADOS DE NAVEGACIÓN =====")
-print(f"Tiempo total     : {total:.2f} s")
-print(f"Distancia aprox. : {travelled:.2f} unidades")
-print(f"Colisiones       : {crashes}")
-print(f"Meta alcanzada   : {'Sí' if goal_done else 'No'}")
-print(
-    f"Estado final     : {'Atascado' if stuck_loops >= MAX_STUCK else 'Finalizado correctamente'}"
-)
-
-# Guardar resultados en archivo
-fecha_actual = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-try:
-    with open(f"resultados_navegacion_{fecha_actual}.txt", "w") as f:
-        f.write("===== RESULTADOS DE NAVEGACIÓN =====\n")
-        f.write(f"Tiempo total     : {total:.2f} s\n")
-        f.write(f"Distancia aprox. : {travelled:.2f} unidades\n")
-        f.write(f"Colisiones       : {crashes}\n")
-        f.write(f"Meta alcanzada   : {'Sí' if goal_done else 'No'}\n")
-        f.write(
-            f"Estado final     : {'Atascado' if stuck_loops >= MAX_STUCK else 'Finalizado correctamente'}\n"
-        )
-except Exception:
-    print("⚠️ No se pudo guardar el archivo de resultados.")
+show_current_results(end, is_final=True)
